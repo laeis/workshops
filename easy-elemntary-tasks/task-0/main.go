@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -71,6 +72,5 @@ func formatParameterTypeError(name, pType, got string) error {
 }
 
 func printError(errorMessage error) {
-	fmt.Print(errorMessage)
-	os.Exit(1)
+	log.Fatal(errorMessage)
 }
