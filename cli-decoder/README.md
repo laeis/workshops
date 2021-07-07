@@ -21,4 +21,5 @@ Develop a cli tool that will:
 `go run main.go -json`
 6. Use json to validate if it works   
 `'{"alias":"go-dms-workshop","desc":"Create app and try it with different DMS", "type":"important", "ts":1473837996,"tags":["Golang","Workshop","DMS"],"etime":"4h","rtime":"8h","reminders":["3h", "15m"]}'`
-7. Validate with xml
+7. Validate with xml    
+   `'<note><to>Tove</to><from>Jani</from><heading>Reminder</heading><body>Don't forget me this weekend!</body></note>'`
