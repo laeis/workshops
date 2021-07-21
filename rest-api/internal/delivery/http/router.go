@@ -17,6 +17,8 @@ func NewRouter(tc Controller) http.Handler {
 	r := mux.NewRouter()
 	TaskHandler := tc
 
+	r.Use(RecoverMiddleware)
+
 	r.HandleFunc("/tasks/{id}", TaskHandler.Get).Methods(http.MethodGet)
 	r.HandleFunc("/tasks", TaskHandler.Fetch).Methods(http.MethodGet)
 	r.HandleFunc("/tasks", TaskHandler.Create).Methods(http.MethodPost)
