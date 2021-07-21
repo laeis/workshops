@@ -1,11 +1,11 @@
-package repositories
+package in_memory
 
 import (
 	"context"
 	"errors"
 	"time"
 	"workshops/rest-api/internal/entities"
-	"workshops/rest-api/internal/filters"
+	"workshops/rest-api/internal/services"
 )
 
 type InMemoryTask struct {
@@ -23,7 +23,7 @@ func NewInMemoryTask() *InMemoryTask {
 	}}
 }
 
-func (r *InMemoryTask) Fetch(ctx context.Context, filters filters.TaskQueryBuilder) (entities.Tasks, error) {
+func (r *InMemoryTask) Fetch(ctx context.Context, filters services.TaskQueryBuilder) (entities.Tasks, error) {
 	return r.Data, nil
 }
 

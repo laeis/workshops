@@ -14,5 +14,21 @@ services:
     ports:
       - ${POSTGRES_PORT:-5432}:5432
 
+
+  pg_testdb:
+    image: postgres
+    restart: always
+    container_name: task-test-postgres
+    environment:
+      - POSTGRES_PASSWORD=somepwd
+      - POSTGRES_USER=someuser
+      - POSTGRES_DB=some-testdb
+    volumes:
+      - pg_test_project:/var/lib/postgresql/data
+    ports:
+      - 54320:5432
+
+
 volumes:
   pg_project:
+  pg_test_project:

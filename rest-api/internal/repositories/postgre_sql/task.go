@@ -1,13 +1,16 @@
-package repositories
+//go:generate mockgen -source taskRepository.go -destination mock/taskRepository_mock.go -package mock
+package postgre_sql
 
 import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	errWrapper "github.com/pkg/errors"
 	"log"
 	"workshops/rest-api/internal/entities"
 	appError "workshops/rest-api/internal/errors"
-	"workshops/rest-api/internal/filters"
+	"workshops/rest-api/internal/services"
 )
 
 type Task struct {
@@ -18,24 +21,17 @@ func NewTask(c *sql.DB) *Task {
 	return &Task{Connection: c}
 }
 
-func (r *Task) Fetch(ctx context.Context, filter filters.TaskQueryBuilder) (entities.Tasks, error) {
+func (r *Task) Fetch(ctx context.Context, taskBuilder services.TaskQueryBuilder) (entities.Tasks, error) {
 	var count int
 	err := r.Connection.QueryRow("SELECT COUNT(*) FROM tasks").Scan(&count)
 	query := "SELECT id, title, description, start_date, category FROM tasks WHERE 0 = 0 "
-	query = filter.BuildCategoryQuery(query)
-	query = filter.BuildPeriodQuery(query)
-	query = filter.BuildOrderQuery(query)
-
-	stmt, err := r.Connection.Prepare(query)
+	query = taskBuilder.BuildCategoryQuery(query)
+	query = taskBuilder.BuildPeriodQuery(query)
+	query = taskBuilder.BuildOrderQuery(query)
+	rows, err := r.Connection.Query(query, taskBuilder.QueryArg()...)
+	defer rows.Close()
 	if err != nil {
-		log.Print("Failed to prepare query: ", err)
-		return nil, err
-	}
-
-	rows, err := stmt.Query(filter.QueryArg()...)
-	if err != nil {
-		log.Print("Failed to execute query: ", err)
-		return nil, err
+		return nil, errWrapper.Wrap(err, "Failed to execute query")
 	}
 	tasks := make(entities.Tasks, 0, count)
 
@@ -54,18 +50,15 @@ func (r *Task) Fetch(ctx context.Context, filter filters.TaskQueryBuilder) (enti
 func (r *Task) Get(ctx context.Context, id int) (*entities.Task, error) {
 	task := entities.Task{}
 	userSql := "SELECT id, title, description, start_date, category  FROM tasks WHERE id = $1"
-	err := r.Connection.QueryRow(userSql, id).Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category)
-	if err != nil {
-		switch true {
-		case errors.Is(err, sql.ErrNoRows):
+	if err := r.Connection.QueryRow(userSql, id).Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
 			message := "Task with Id %d not exists"
-			log.Print(message, err)
-			return nil, appError.WrapErrorf(err, appError.ErrorCodeNotFound, message, id)
-		default:
-			log.Print("Failed to execute query: ", err)
-			return nil, err
+			log.Println(message, err)
+			return nil, fmt.Errorf("Task with Id %d: %w ", id, appError.NotFound)
+			//return nil, errWrapper.Wrapf(err, message, id)
 		}
-
+		log.Print("Failed to execute query: ", err)
+		return nil, err
 	}
 	return &task, nil
 }
@@ -83,32 +76,31 @@ func (r *Task) Store(ctx context.Context, task *entities.Task) (*entities.Task, 
 }
 
 func (r *Task) Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error) {
-	query, err := r.Connection.Prepare("update tasks set title=$1, description=$2, category=$3, start_date=$4 where id=$5")
-	if err != nil {
-		log.Printf("Error %s when prepare query for update task", err)
-		return nil, err
-	}
-
-	_, err = query.Exec(task.Title, task.Description, task.Category, task.Date, id)
+	query := "update tasks set title=$1, description=$2, category=$3, start_date=$4 where id=$5"
+	_, err := r.Connection.Exec(query, task.Title, task.Description, task.Category, task.Date, id)
 	if err != nil {
 		log.Printf("Error %s when update task %d", err, id)
 		return nil, err
 	}
 	uTask, err := r.Get(ctx, id)
 	if err != nil {
-		log.Printf("Error %s when get updatable task %d", err, id)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("Task with Id %d: %w ", id, appError.NotFound)
+		}
+		log.Print("Failed to execute query: ", err)
 		return nil, err
 	}
 	return uTask, nil
 }
 
 func (r *Task) Delete(ctx context.Context, id int) (bool, error) {
-	stmt, err := r.Connection.PrepareContext(ctx, "delete from tasks where id=$1")
-	if err != nil {
-		log.Printf("Error %s when prepare query for delete task %d", err, id)
-		return false, err
+	result, err := r.Connection.ExecContext(ctx, "delete from tasks where id=$1", id)
+	if result != nil {
+		d, _ := result.RowsAffected()
+		if d == 0 {
+			return false, fmt.Errorf("Task with Id %d: %w ", id, appError.NotFound)
+		}
 	}
-	_, err = stmt.ExecContext(ctx, id)
 	if err != nil {
 		log.Printf("Error %s when delete task %d", err, id)
 		return false, err

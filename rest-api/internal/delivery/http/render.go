@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,32 +10,37 @@ import (
 )
 
 // ErrorResponse represents a response containing an error message.
-type ErrorResponse struct {
-	Error string `json:"error"`
+type Response struct {
+	Error   string      `json:"error,omitempty"`
+	Payload interface{} `json:"payload,omitempty"`
 }
 
 func renderErrorResponse(ctx context.Context, w http.ResponseWriter, msg string, err error) {
-	resp := ErrorResponse{Error: msg}
+	errorMsg := msg
+	if errorMsg == "" {
+		errorMsg = err.Error()
+	}
+	resp := Response{Error: errorMsg}
 	status := http.StatusInternalServerError
-
-	var ierr *appError.Error
-	if !errors.As(err, &ierr) {
-		resp.Error = "internal error"
-	} else {
-		switch ierr.Code() {
-		case appError.ErrorCodeNotFound:
-			status = http.StatusNotFound
-		case appError.ErrorCodeInvalidArgument:
-			status = http.StatusBadRequest
-		}
+	switch true {
+	case errors.Is(err, sql.ErrNoRows), errors.Is(err, appError.NotFound):
+		status = http.StatusNotFound
+	case errors.Is(err, appError.BadRequest):
+		status = http.StatusBadRequest
 	}
 	renderResponse(w, resp, status)
 }
 
 func renderResponse(w http.ResponseWriter, res interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
+	data := res
+	if _, ok := data.(Response); !ok {
+		data = Response{
+			Payload: res,
+		}
+	}
 
-	content, err := json.Marshal(res)
+	content, err := json.Marshal(data)
 	if err != nil {
 		// XXX Do something with the error ;)
 		w.WriteHeader(http.StatusInternalServerError)
