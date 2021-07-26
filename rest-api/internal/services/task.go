@@ -3,15 +3,16 @@ package services
 
 import (
 	"context"
-	"workshops/rest-api/internal/builders"
 	"workshops/rest-api/internal/entities"
 	"workshops/rest-api/internal/filters"
+	"workshops/rest-api/internal/repositories/postgre_sql/builders"
 )
 
 type TaskQueryBuilder interface {
 	BuildCategoryQuery(string) string
 	BuildPeriodQuery(string) string
 	BuildOrderQuery(string) string
+	BuildOwnerQuery(string, string) string
 	QueryArg() []interface{}
 }
 
@@ -25,20 +26,39 @@ type TaskRepository interface {
 
 type TaskService struct {
 	repo TaskRepository
+	user UserRepository
 }
 
-func NewTask(r TaskRepository) *TaskService {
+func NewTask(r TaskRepository, ur UserRepository) *TaskService {
 	return &TaskService{
 		repo: r,
+		user: ur,
 	}
 }
 
 func (ts *TaskService) Get(ctx context.Context, id int) (*entities.Task, error) {
-	return ts.repo.Get(ctx, id)
+	task, err := ts.repo.Get(ctx, id)
+	if err != nil {
+		return task, err
+	}
+	timezone, err := ts.user.GetAuthTimezone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	task.InTimezone(timezone)
+	return task, err
 }
 func (ts *TaskService) Fetch(ctx context.Context, filters *filters.TaskFilter) (entities.Tasks, error) {
 	builder := builders.NewTask(filters)
-	return ts.repo.Fetch(ctx, &builder)
+	tasks, err := ts.repo.Fetch(ctx, &builder)
+	timezone, err := ts.user.GetAuthTimezone(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range tasks {
+		tasks[i].InTimezone(timezone)
+	}
+	return tasks, err
 }
 func (ts *TaskService) Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error) {
 	return ts.repo.Update(ctx, id, task)

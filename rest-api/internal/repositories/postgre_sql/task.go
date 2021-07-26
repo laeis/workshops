@@ -8,6 +8,7 @@ import (
 	"fmt"
 	errWrapper "github.com/pkg/errors"
 	"log"
+	"workshops/rest-api/internal/config"
 	"workshops/rest-api/internal/entities"
 	appError "workshops/rest-api/internal/errors"
 	"workshops/rest-api/internal/services"
@@ -27,8 +28,12 @@ func (r *Task) Fetch(ctx context.Context, taskBuilder services.TaskQueryBuilder)
 	query := "SELECT id, title, description, start_date, category FROM tasks WHERE 0 = 0 "
 	query = taskBuilder.BuildCategoryQuery(query)
 	query = taskBuilder.BuildPeriodQuery(query)
+	userId := ctx.Value(config.CtxAuthId).(string)
+	query = taskBuilder.BuildOwnerQuery(query, userId)
 	query = taskBuilder.BuildOrderQuery(query)
+	fmt.Printf("%v", query, taskBuilder.QueryArg())
 	rows, err := r.Connection.Query(query, taskBuilder.QueryArg()...)
+
 	defer rows.Close()
 	if err != nil {
 		return nil, errWrapper.Wrap(err, "Failed to execute query")
@@ -49,8 +54,8 @@ func (r *Task) Fetch(ctx context.Context, taskBuilder services.TaskQueryBuilder)
 
 func (r *Task) Get(ctx context.Context, id int) (*entities.Task, error) {
 	task := entities.Task{}
-	userSql := "SELECT id, title, description, start_date, category  FROM tasks WHERE id = $1"
-	if err := r.Connection.QueryRow(userSql, id).Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category); err != nil {
+	userSql := "SELECT id, title, description, start_date, category, user_id  FROM tasks WHERE id = $1"
+	if err := r.Connection.QueryRow(userSql, id).Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category, &task.UserId); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			message := "Task with Id %d not exists"
 			log.Println(message, err)
@@ -60,13 +65,20 @@ func (r *Task) Get(ctx context.Context, id int) (*entities.Task, error) {
 		log.Print("Failed to execute query: ", err)
 		return nil, err
 	}
+	authId := ctx.Value(config.CtxAuthId)
+	if task.UserId != authId {
+		err := appError.AccessForbidden
+		log.Printf("Permission denied: %s", err)
+		return nil, err
+	}
 	return &task, nil
 }
 
 func (r *Task) Store(ctx context.Context, task *entities.Task) (*entities.Task, error) {
 	query := "INSERT INTO tasks(title, description, category, start_date, user_id) VALUES ($1, $2, $3, $4, $5) returning id"
 	var lastInsertId int64
-	err := r.Connection.QueryRow(query, task.Title, task.Description, task.Category, task.Date, "6ba7b814-9dad-11d1-80b4-00c04fd430c8").Scan(&lastInsertId)
+	authId := ctx.Value(config.CtxAuthId)
+	err := r.Connection.QueryRow(query, task.Title, task.Description, task.Category, task.Date, authId).Scan(&lastInsertId)
 	if err != nil {
 		log.Printf("Error %s when inserting row into tasks table", err)
 		return nil, err
@@ -76,6 +88,11 @@ func (r *Task) Store(ctx context.Context, task *entities.Task) (*entities.Task, 
 }
 
 func (r *Task) Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error) {
+	if !r.hasRequestPermission(ctx, id) {
+		err := appError.AccessForbidden
+		log.Printf("Permission denied: %s", err)
+		return nil, err
+	}
 	query := "update tasks set title=$1, description=$2, category=$3, start_date=$4 where id=$5"
 	_, err := r.Connection.Exec(query, task.Title, task.Description, task.Category, task.Date, id)
 	if err != nil {
@@ -94,6 +111,11 @@ func (r *Task) Update(ctx context.Context, id int, task *entities.Task) (*entiti
 }
 
 func (r *Task) Delete(ctx context.Context, id int) (bool, error) {
+	if !r.hasRequestPermission(ctx, id) {
+		err := appError.AccessForbidden
+		log.Printf("Permission denied: %s", err)
+		return false, err
+	}
 	result, err := r.Connection.ExecContext(ctx, "delete from tasks where id=$1", id)
 	if result != nil {
 		d, _ := result.RowsAffected()
@@ -106,4 +128,14 @@ func (r *Task) Delete(ctx context.Context, id int) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (r *Task) hasRequestPermission(ctx context.Context, taskId int) bool {
+	task := entities.Task{}
+	authId := ctx.Value(config.CtxAuthId)
+	userSql := "SELECT id FROM tasks WHERE id = $1 AND user_id = $2"
+	if err := r.Connection.QueryRow(userSql, taskId, authId).Scan(&task.Id); err != nil {
+		return false
+	}
+	return true
 }

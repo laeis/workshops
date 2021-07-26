@@ -13,4 +13,8 @@ type Error struct {
 
 var BadRequest = errors.New("Bad request")
 
+var NotAuthorized = errors.New("Not authorized")
+
+var AccessForbidden = errors.New("Access forbidden")
+
 var NotFound = errors.New("not found")

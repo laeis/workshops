@@ -27,6 +27,10 @@ func renderErrorResponse(ctx context.Context, w http.ResponseWriter, msg string,
 		status = http.StatusNotFound
 	case errors.Is(err, appError.BadRequest):
 		status = http.StatusBadRequest
+	case errors.Is(err, appError.AccessForbidden):
+		status = http.StatusForbidden
+	case errors.Is(err, appError.NotAuthorized):
+		status = http.StatusUnauthorized
 	}
 	renderResponse(w, resp, status)
 }

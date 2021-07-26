@@ -7,14 +7,9 @@ import (
 )
 
 type Task struct {
-	args        []interface{}
-	placeholder int
-	filters     *filters.TaskFilter
-}
-
-func (tb *Task) NextPlaceholder() int {
-	tb.placeholder++
-	return tb.placeholder
+	ArgStorage
+	QueryPlaceholder
+	filters *filters.TaskFilter
 }
 
 func NewTask(filters *filters.TaskFilter) Task {
@@ -25,7 +20,7 @@ func (tb *Task) BuildCategoryQuery(query string) string {
 	if tb.filters.Category == "" {
 		return query
 	}
-	tb.args = append(tb.args, tb.filters.Category)
+	tb.AddQueryArg(tb.filters.Category)
 	return fmt.Sprintf("%s AND category=$%d ", query, tb.NextPlaceholder())
 }
 
@@ -37,15 +32,17 @@ func (tb *Task) BuildPeriodQuery(query string) string {
 	endPlaceholder := tb.NextPlaceholder()
 	periodQuery := fmt.Sprintf("%s AND (start_date >= $%d  AND start_date <= $%d) ", query, beginPlaceholder, endPlaceholder)
 	begin, end := createPeriod(tb.filters.Period)
-	tb.args = append(tb.args, begin, end)
+	tb.AddQueryArg(begin, end)
 	return periodQuery
 }
 
 func (tb *Task) BuildOrderQuery(query string) string {
 	return fmt.Sprintf("%s ORDER BY %s %s", query, tb.filters.OrderBy, tb.filters.Order)
 }
-func (tb *Task) QueryArg() []interface{} {
-	return tb.args
+
+func (tb *Task) BuildOwnerQuery(query string, userId string) string {
+	tb.AddQueryArg(userId)
+	return fmt.Sprintf("%s AND user_id=$%d ", query, tb.NextPlaceholder())
 }
 
 func createPeriod(period string) (time.Time, time.Time) {
