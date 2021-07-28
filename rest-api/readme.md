@@ -38,3 +38,26 @@
 #####  Logout: ##### 
 * Parse payload
 * Remove token by user id
+
+### Part 3 #### 
+Add system endpoints for return metrics;
+- served in a separate port;
+- metrics:
+    - total number of events,
+    - number of users,
+    - requests per seconds,
+    - requests per seconds per user,
+    - goroutines used,
+    - memory used,
+    - cpu used;
+* Organize load testing with `vegetta`;
+* Add support of gracefull shutdown;
+* Use structured logs (with tabs; key: value format);
+* Add enough context information to the error message/logs;
+### Links
+- [Metrics](https://prometheus.io/docs/guides/go-application/)
+- [Graceful shutdown](https://medium.com/@pinkudebnath/graceful-shutdown-of-golang-servers-using-context-and-os-signals-cc1fa2c55e97)
+- [tests coverage](https://blog.golang.org/cover)
+- [structured logging](https://www.client9.com/structured-logging-in-golang/)
+- [logs for HTTP service](https://ribice.medium.com/http-logging-in-go-344e6fca057c)
+- [load testing with vegeta](https://geshan.com.np/blog/2020/09/vegeta-load-testing-primer-with-examples/)
