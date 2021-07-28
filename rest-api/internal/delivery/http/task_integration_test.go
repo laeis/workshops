@@ -1,3 +1,4 @@
+//+build integration
 package http
 
 import (
@@ -63,7 +64,8 @@ func TestMain(m *testing.M) {
 
 	truncateTables(db, []string{"tasks"})
 	taskRepo := postgre_sql.NewTask(db)
-	taskService := services.NewTask(taskRepo)
+	userRepo := postgre_sql.NewUser(db)
+	taskService := services.NewTask(taskRepo, userRepo)
 	taskController = NewTask(taskService)
 
 	os.Exit(m.Run())
