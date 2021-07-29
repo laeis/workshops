@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sethvargo/go-envconfig"
 	"log"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"time"
 	"workshops/rest-api/internal/config"
 	handler "workshops/rest-api/internal/delivery/http"
+	"workshops/rest-api/internal/delivery/http/middlewares"
 	"workshops/rest-api/internal/delivery/http/router"
 	"workshops/rest-api/internal/entities"
 	"workshops/rest-api/internal/repositories/postgre_sql"
@@ -71,8 +73,10 @@ func serve(ctx context.Context) (err error) {
 	authController := handler.NewAuth(userService)
 
 	r := mux.NewRouter()
-	r.Use(handler.RecoverMiddleware)
-	auhMiddleware := mux.MiddlewareFunc(handler.AuthMiddlewareAdapter(userService, &jwtWrapper))
+	r.Use(middlewares.Recover)
+	r.Use(middlewares.Metrics)
+
+	auhMiddleware := mux.MiddlewareFunc(middlewares.AuthAdapter(userService, &jwtWrapper))
 
 	router.Task(r.PathPrefix("/tasks").Subrouter(), taskController, auhMiddleware)
 	router.User(r.PathPrefix("/users").Subrouter(), userController, auhMiddleware)
@@ -91,6 +95,21 @@ func serve(ctx context.Context) (err error) {
 
 	log.Printf("server started")
 
+	metrics := r.PathPrefix("/metrics").Subrouter()
+	metrics.Handle("", promhttp.Handler())
+	promSrv := &http.Server{
+		Addr:    ":9000",
+		Handler: metrics,
+	}
+
+	go func() {
+		if err := promSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("promteus listen:%+s\n", err)
+		}
+	}()
+
+	log.Printf("prometeus started")
+
 	<-ctx.Done()
 
 	log.Printf("server stopped")
@@ -104,11 +123,16 @@ func serve(ctx context.Context) (err error) {
 		log.Fatalf("server Shutdown Failed:%+s", err)
 	}
 
-	log.Printf("server exited properly")
-
 	if err == http.ErrServerClosed {
 		err = nil
 	}
+
+	if err := promSrv.Shutdown(ctxShutDown); err != nil {
+		log.Fatalf("promtetus server Shutdown Failed:%+s", err)
+	}
+
+	log.Printf("server exited properly")
+
 	return
 }
 

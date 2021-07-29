@@ -1,4 +1,4 @@
-package http
+package response
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 	appError "workshops/rest-api/internal/errors"
 )
 
-// ErrorResponse represents a response containing an error message.
+//Response represents a response containing an error message.
 type Response struct {
 	Error   string      `json:"error,omitempty"`
 	Payload interface{} `json:"payload,omitempty"`
 }
 
-func renderErrorResponse(ctx context.Context, w http.ResponseWriter, msg string, err error) {
+func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err error) {
 	errorMsg := msg
 	if errorMsg == "" {
 		errorMsg = err.Error()
@@ -32,10 +32,10 @@ func renderErrorResponse(ctx context.Context, w http.ResponseWriter, msg string,
 	case errors.Is(err, appError.NotAuthorized):
 		status = http.StatusUnauthorized
 	}
-	renderResponse(w, resp, status)
+	Render(w, resp, status)
 }
 
-func renderResponse(w http.ResponseWriter, res interface{}, status int) {
+func Render(w http.ResponseWriter, res interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	data := res
 	if _, ok := data.(Response); !ok {

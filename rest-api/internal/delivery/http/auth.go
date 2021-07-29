@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"workshops/rest-api/internal/config"
+	"workshops/rest-api/internal/delivery/http/response"
 	"workshops/rest-api/internal/entities"
 	appErrors "workshops/rest-api/internal/errors"
 	"workshops/rest-api/internal/validators"
@@ -32,22 +33,22 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	decodeErr := json.NewDecoder(r.Body).Decode(&userTemplate)
 	if decodeErr != nil {
-		renderErrorResponse(r.Context(), w, appErrors.BadRequest.Error(), errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr))
+		response.RenderError(r.Context(), w, appErrors.BadRequest.Error(), errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr))
 		return
 	}
 	validator := validators.UserValidator(&userTemplate)
 	if err := validator.Validate("email", "password"); err != nil {
-		renderErrorResponse(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err))
+		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err))
 		return
 	}
 
 	token, err := h.service.Login(r.Context(), userTemplate)
 	if err != nil {
-		renderErrorResponse(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Wrong credentional %w", err))
+		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Wrong credentional %w", err))
 		return
 	}
 
-	renderResponse(w, token, http.StatusOK)
+	response.Render(w, token, http.StatusOK)
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
@@ -55,15 +56,15 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	token, tokenOk := r.Context().Value(config.CtxToken).(string)
 	if !tokenOk && !idOk {
 		message := "Required parameters are missing"
-		renderErrorResponse(r.Context(), w, message, errors.Wrap(appErrors.BadRequest, message))
+		response.RenderError(r.Context(), w, message, errors.Wrap(appErrors.BadRequest, message))
 		return
 	}
 
 	success, err := h.service.Logout(r.Context(), id, token)
 	if err != nil {
-		renderErrorResponse(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Some error hapen %w", err))
+		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Some error hapen %w", err))
 		return
 	}
 
-	renderResponse(w, success, http.StatusOK)
+	response.Render(w, success, http.StatusOK)
 }

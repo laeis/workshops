@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
+	"workshops/rest-api/internal/delivery/http/response"
 	"workshops/rest-api/internal/entities"
 	"workshops/rest-api/internal/errors"
 	"workshops/rest-api/internal/filters"
@@ -23,7 +24,7 @@ type fetchTestCase struct {
 	inputBody            string
 	mockBehavior         func(m *MockTaskService, filters *filters.TaskFilter)
 	expectedStatus       int
-	expectedBodyResponse Response
+	expectedBodyResponse response.Response
 }
 
 func TestTaskFetchMock(t *testing.T) {
@@ -36,7 +37,7 @@ func TestTaskFetchMock(t *testing.T) {
 				m.EXPECT().Fetch(context.Background(), filters)
 			},
 			expectedStatus:       http.StatusOK,
-			expectedBodyResponse: Response{},
+			expectedBodyResponse: response.Response{},
 		},
 		{
 			name:      "Error fetch",
@@ -45,7 +46,7 @@ func TestTaskFetchMock(t *testing.T) {
 				m.EXPECT().Fetch(context.Background(), filters).Return(nil, fmt.Errorf("Fetch Error"))
 			},
 			expectedStatus: http.StatusInternalServerError,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Error: fmt.Sprint("Fetch Error"),
 			},
 		},
@@ -54,7 +55,7 @@ func TestTaskFetchMock(t *testing.T) {
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("Fetch Case %d: %s ", i, c.name), func(t *testing.T) {
 			request, _ := http.NewRequest(http.MethodGet, "/tasks?category", nil)
-			response := httptest.NewRecorder()
+			tr := httptest.NewRecorder()
 			ctrl := gomock.NewController(t)
 			service := NewMockTaskService(ctrl)
 			taskController := NewTask(service)
@@ -62,13 +63,13 @@ func TestTaskFetchMock(t *testing.T) {
 			queryFilters := filters.ValidatedTaskFilter(&validator, request.URL.Query())
 			c.mockBehavior(service, &queryFilters)
 
-			taskController.Fetch(response, request)
+			taskController.Fetch(tr, request)
 
-			got := Response{}
-			dec := json.NewDecoder(response.Body)
+			got := response.Response{}
+			dec := json.NewDecoder(tr.Body)
 			_ = dec.Decode(&got)
 			want := c.expectedBodyResponse
-			assert.Equal(t, response.Code, c.expectedStatus)
+			assert.Equal(t, tr.Code, c.expectedStatus)
 			assert.Equal(t, got, want, fmt.Sprintf("got %q, want %q", got, want))
 		})
 	}
@@ -80,7 +81,7 @@ type getTestCases struct {
 	vars                 map[string]string
 	mockBehavior         func(m *MockTaskService)
 	expectedStatus       int
-	expectedBodyResponse Response
+	expectedBodyResponse response.Response
 }
 
 func TestTaskGetMock(t *testing.T) {
@@ -93,7 +94,7 @@ func TestTaskGetMock(t *testing.T) {
 			},
 			vars:                 map[string]string{"id": "1"},
 			expectedStatus:       200,
-			expectedBodyResponse: Response{},
+			expectedBodyResponse: response.Response{},
 		},
 		{
 			name:      "With atoi error",
@@ -102,7 +103,7 @@ func TestTaskGetMock(t *testing.T) {
 				//EXPECT error before mock run
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Error: "strconv.Atoi: parsing \"\": invalid syntax",
 			},
 		},
@@ -114,7 +115,7 @@ func TestTaskGetMock(t *testing.T) {
 			},
 			vars:           map[string]string{"id": "1"},
 			expectedStatus: 404,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Error: errors.NotFound.Error(),
 			},
 		},
@@ -124,7 +125,7 @@ func TestTaskGetMock(t *testing.T) {
 			request, _ := http.NewRequest(http.MethodGet, "/tasks/1", bytes.NewBufferString(c.inputBody))
 			request = mux.SetURLVars(request, c.vars)
 
-			response := httptest.NewRecorder()
+			tr := httptest.NewRecorder()
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -133,14 +134,14 @@ func TestTaskGetMock(t *testing.T) {
 			c.mockBehavior(service)
 
 			taskController := NewTask(service)
-			taskController.Get(response, request)
+			taskController.Get(tr, request)
 
-			got := Response{}
-			dec := json.NewDecoder(response.Body)
+			got := response.Response{}
+			dec := json.NewDecoder(tr.Body)
 			_ = dec.Decode(&got)
 			want := c.expectedBodyResponse
 
-			assert.Equal(t, c.expectedStatus, response.Code)
+			assert.Equal(t, c.expectedStatus, tr.Code)
 			assert.Equal(t, got, want, fmt.Sprintf("got %q, want %q", got, want))
 		})
 	}
@@ -202,7 +203,7 @@ func TestTaskCreateMock(t *testing.T) {
 			}
 
 			request, _ := http.NewRequest(http.MethodPost, "/tasks", data)
-			response := httptest.NewRecorder()
+			tr := httptest.NewRecorder()
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -211,12 +212,12 @@ func TestTaskCreateMock(t *testing.T) {
 			c.mockBehavior(service)
 
 			taskController := NewTask(service)
-			taskController.Create(response, request)
+			taskController.Create(tr, request)
 
-			got := response.Body.String()
+			got := tr.Body.String()
 			want := c.expectedBodyResponse
 
-			assert.Equal(t, c.expectedStatus, response.Code)
+			assert.Equal(t, c.expectedStatus, tr.Code)
 			assert.Equal(t, got, want, fmt.Sprintf("got %q, want %q", got, want))
 		})
 	}
@@ -293,7 +294,7 @@ func TestTaskUpdateMock(t *testing.T) {
 
 			request, _ := http.NewRequest(http.MethodPost, "/tasks", data)
 			request = mux.SetURLVars(request, c.vars)
-			response := httptest.NewRecorder()
+			tr := httptest.NewRecorder()
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -302,12 +303,12 @@ func TestTaskUpdateMock(t *testing.T) {
 			c.mockBehavior(service)
 
 			taskController := NewTask(service)
-			taskController.Update(response, request)
+			taskController.Update(tr, request)
 
-			got := response.Body.String()
+			got := tr.Body.String()
 			want := c.expectedBodyResponse
 
-			assert.Equal(t, c.expectedStatus, response.Code)
+			assert.Equal(t, c.expectedStatus, tr.Code)
 			assert.Equal(t, got, want, fmt.Sprintf("got %q, want %q", got, want))
 		})
 	}
@@ -323,7 +324,7 @@ func TestTaskDeleteMock(t *testing.T) {
 			},
 			vars:           map[string]string{"id": "1"},
 			expectedStatus: 200,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Payload: true,
 			},
 		},
@@ -334,7 +335,7 @@ func TestTaskDeleteMock(t *testing.T) {
 				//EXPECT error before mock run
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Error: "Wrong Id parameter",
 			},
 		},
@@ -346,7 +347,7 @@ func TestTaskDeleteMock(t *testing.T) {
 			},
 			vars:           map[string]string{"id": "1"},
 			expectedStatus: 500,
-			expectedBodyResponse: Response{
+			expectedBodyResponse: response.Response{
 				Error: "Task didnt delete",
 			},
 		},
@@ -356,7 +357,7 @@ func TestTaskDeleteMock(t *testing.T) {
 			request, _ := http.NewRequest(http.MethodGet, "/tasks/1", bytes.NewBufferString(c.inputBody))
 			request = mux.SetURLVars(request, c.vars)
 
-			response := httptest.NewRecorder()
+			tr := httptest.NewRecorder()
 
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -365,14 +366,14 @@ func TestTaskDeleteMock(t *testing.T) {
 			c.mockBehavior(service)
 
 			taskController := NewTask(service)
-			taskController.Delete(response, request)
+			taskController.Delete(tr, request)
 
-			got := Response{}
-			dec := json.NewDecoder(response.Body)
+			got := response.Response{}
+			dec := json.NewDecoder(tr.Body)
 			_ = dec.Decode(&got)
 			want := c.expectedBodyResponse
 
-			assert.Equal(t, c.expectedStatus, response.Code)
+			assert.Equal(t, c.expectedStatus, tr.Code)
 			assert.Equal(t, got, want, fmt.Sprintf("got %q, want %q", got, want))
 		})
 	}
