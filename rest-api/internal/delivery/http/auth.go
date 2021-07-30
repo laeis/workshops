@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"net/http"
 	"workshops/rest-api/internal/config"
 	"workshops/rest-api/internal/delivery/http/response"
@@ -14,6 +15,7 @@ import (
 
 type AuthHandler struct {
 	service AuthService
+	log     *zap.Logger
 }
 
 type AuthService interface {
@@ -22,49 +24,71 @@ type AuthService interface {
 	FindByToken(ctx context.Context, token string) (*entities.User, error)
 }
 
-func NewAuth(s AuthService) *AuthHandler {
+func NewAuth(s AuthService, logger *zap.Logger) *AuthHandler {
 	return &AuthHandler{
 		service: s,
+		log:     logger,
 	}
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	userTemplate := entities.EmptyUser()
-
+	logger := h.log.With(zap.String("handler", "Login"), zap.String("route", r.URL.RequestURI()))
 	decodeErr := json.NewDecoder(r.Body).Decode(&userTemplate)
 	if decodeErr != nil {
-		response.RenderError(r.Context(), w, appErrors.BadRequest.Error(), errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr))
+		response.RenderError(
+			r.Context(),
+			w,
+			appErrors.BadRequest.Error(),
+			errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr),
+		).WithLogger(logger)
 		return
 	}
 	validator := validators.UserValidator(&userTemplate)
 	if err := validator.Validate("email", "password"); err != nil {
-		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err))
+		response.RenderError(
+			r.Context(),
+			w,
+			err.Error(),
+			errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err),
+		).WithLogger(logger)
 		return
 	}
 
 	token, err := h.service.Login(r.Context(), userTemplate)
 	if err != nil {
-		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Wrong credentional %w", err))
+		response.RenderError(
+			r.Context(),
+			w,
+			err.Error(),
+			errors.Wrapf(appErrors.BadRequest, "Wrong credentional %w", err),
+		).WithLogger(logger)
 		return
 	}
 
-	response.Render(w, token, http.StatusOK)
+	response.Render(w, token, http.StatusOK).WithLogger(logger)
 }
 
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	id, idOk := r.Context().Value(config.CtxAuthId).(string)
 	token, tokenOk := r.Context().Value(config.CtxToken).(string)
+	logger := h.log.With(zap.String("handler", "Login"), zap.String("route", r.URL.RequestURI()))
 	if !tokenOk && !idOk {
 		message := "Required parameters are missing"
-		response.RenderError(r.Context(), w, message, errors.Wrap(appErrors.BadRequest, message))
+		response.RenderError(r.Context(), w, message, errors.Wrap(appErrors.BadRequest, message)).WithLogger(logger)
 		return
 	}
 
 	success, err := h.service.Logout(r.Context(), id, token)
 	if err != nil {
-		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Some error hapen %w", err))
+		response.RenderError(
+			r.Context(),
+			w,
+			err.Error(),
+			errors.Wrapf(appErrors.BadRequest, "Some error hapen %w", err),
+		).WithLogger(logger)
 		return
 	}
 
-	response.Render(w, success, http.StatusOK)
+	response.Render(w, success, http.StatusOK).WithLogger(logger)
 }

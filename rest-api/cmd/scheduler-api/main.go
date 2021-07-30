@@ -10,6 +10,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sethvargo/go-envconfig"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	"os"
@@ -68,9 +69,12 @@ func serve(ctx context.Context) (err error) {
 	taskService := services.NewTask(taskRepo, userRepo)
 	userService := services.NewUser(userRepo, &jwtWrapper)
 
-	taskController := handler.NewTask(taskService)
-	userController := handler.NewUser(userService)
-	authController := handler.NewAuth(userService)
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	taskController := handler.NewTask(taskService, logger)
+	userController := handler.NewUser(userService, logger)
+	authController := handler.NewAuth(userService, logger)
 
 	r := mux.NewRouter()
 	r.Use(middlewares.Recover)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"net/http"
 	"workshops/rest-api/internal/delivery/http/response"
 	"workshops/rest-api/internal/entities"
@@ -15,6 +16,7 @@ import (
 
 type UserHandler struct {
 	service UserService
+	log     *zap.Logger
 }
 
 type UserService interface {
@@ -23,9 +25,10 @@ type UserService interface {
 	Create(ctx context.Context, user *entities.User) (*entities.User, error)
 }
 
-func NewUser(s UserService) *UserHandler {
+func NewUser(s UserService, logger *zap.Logger) *UserHandler {
 	return &UserHandler{
 		service: s,
+		log:     logger,
 	}
 }
 

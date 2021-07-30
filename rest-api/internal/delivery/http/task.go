@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
+	"go.uber.org/zap"
 	"net/http"
 	"strconv"
 	"workshops/rest-api/internal/delivery/http/response"
@@ -18,6 +19,7 @@ import (
 
 type TaskHandler struct {
 	service TaskService
+	log     *zap.Logger
 }
 
 type TaskService interface {
@@ -28,9 +30,10 @@ type TaskService interface {
 	Delete(ctx context.Context, id int) (bool, error)
 }
 
-func NewTask(t TaskService) TaskHandler {
+func NewTask(t TaskService, logger *zap.Logger) TaskHandler {
 	return TaskHandler{
 		service: t,
+		log:     logger,
 	}
 }
 
@@ -39,7 +42,6 @@ func (t TaskHandler) Get(w http.ResponseWriter, r *http.Request) {
 	id, atoiErr := strconv.Atoi(params["id"])
 
 	if atoiErr != nil {
-		//fmt.Println( errors.Is(&appError.NotFound{Err: atoiErr}, &appError.BadRequest{}))
 		response.RenderError(r.Context(), w, atoiErr.Error(), appError.BadRequest)
 		return
 	}

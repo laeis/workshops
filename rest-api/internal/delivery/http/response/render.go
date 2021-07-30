@@ -5,22 +5,28 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"go.uber.org/zap"
 	"net/http"
 	appError "workshops/rest-api/internal/errors"
 )
 
+type Logger interface {
+	WithLogger(logger *zap.Logger)
+}
+
 //Response represents a response containing an error message.
-type Response struct {
+type responsePayload struct {
 	Error   string      `json:"error,omitempty"`
 	Payload interface{} `json:"payload,omitempty"`
 }
 
-func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err error) {
+func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err error) Logger {
 	errorMsg := msg
 	if errorMsg == "" {
 		errorMsg = err.Error()
 	}
-	resp := Response{Error: errorMsg}
+	resp := responsePayload{Error: errorMsg}
 	status := http.StatusInternalServerError
 	switch true {
 	case errors.Is(err, sql.ErrNoRows), errors.Is(err, appError.NotFound):
@@ -33,13 +39,17 @@ func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err err
 		status = http.StatusUnauthorized
 	}
 	Render(w, resp, status)
+	return ErrorLogger{
+		code:    status,
+		message: fmt.Sprintf("%s : %s", msg, err.Error()),
+	}
 }
 
-func Render(w http.ResponseWriter, res interface{}, status int) {
+func Render(w http.ResponseWriter, res interface{}, status int) Logger {
 	w.Header().Set("Content-Type", "application/json")
 	data := res
-	if _, ok := data.(Response); !ok {
-		data = Response{
+	if _, ok := data.(responsePayload); !ok {
+		data = responsePayload{
 			Payload: res,
 		}
 	}
@@ -48,12 +58,19 @@ func Render(w http.ResponseWriter, res interface{}, status int) {
 	if err != nil {
 		// XXX Do something with the error ;)
 		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return ErrorLogger{
+			code:    http.StatusInternalServerError,
+			message: err.Error(),
+		}
 	}
 
 	w.WriteHeader(status)
 
 	if _, err = w.Write(content); err != nil {
 		// XXX Do something with the error ;)
+	}
+	return SuccessLogger{
+		code:    status,
+		message: "Successful done request",
 	}
 }
