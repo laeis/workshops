@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+
 	"go.uber.org/zap"
 	"net/http"
 	"workshops/rest-api/internal/delivery/http/response"
@@ -33,53 +34,80 @@ func NewUser(s UserService, logger *zap.Logger) *UserHandler {
 }
 
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	userTemplate := entities.EmptyUser()
+	logger := h.log.With(zap.String("handler", "CreateUser"), zap.String("route", r.URL.RequestURI()))
 
+	userTemplate := entities.EmptyUser()
 	decodeErr := json.NewDecoder(r.Body).Decode(&userTemplate)
+
 	if decodeErr != nil {
-		response.RenderError(r.Context(), w, appErrors.BadRequest.Error(), errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr))
+		message := "Couldn't decode request"
+		wErr := errors.Wrapf(appErrors.BadRequest, "%s: %w", message, decodeErr)
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, message, wErr)
 		return
 	}
+
 	validator := validators.UserValidator(&userTemplate)
+
 	if err := validator.Validate(); err != nil {
-		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err))
+		wErr := errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err)
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, err.Error(), wErr)
 		return
 	}
 
 	user, err := h.service.Create(r.Context(), &userTemplate)
+
 	if err != nil {
-		response.RenderError(r.Context(), w, "", err)
+		wErr := errors.Wrap(err, "Not created")
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, "", wErr)
 		return
 	}
+
 	metrics.UserCnt.Inc()
+
 	response.Render(w, user, http.StatusOK)
 }
 
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
+	logger := h.log.With(zap.String("handler", "UpdateUser"), zap.String("route", r.URL.RequestURI()))
+
 	vars := mux.Vars(r)
 	id, ok := vars["id"]
+
 	if !ok {
 		message := "Id is required parameter"
-		response.RenderError(r.Context(), w, message, errors.Wrap(appErrors.BadRequest, message))
+		wErr := errors.Wrap(appErrors.BadRequest, message)
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, message, wErr)
 		return
 	}
 
 	userTemplate := entities.EmptyUser()
 	decodeErr := json.NewDecoder(r.Body).Decode(&userTemplate)
+
 	if decodeErr != nil {
 		response.RenderError(r.Context(), w, appErrors.BadRequest.Error(), errors.Wrapf(appErrors.BadRequest, "Couldnt decode request: %w", decodeErr))
 		return
 	}
 
 	validator := validators.UserValidator(&userTemplate)
+
 	if err := validator.Validate("timezone"); err != nil {
-		response.RenderError(r.Context(), w, err.Error(), errors.Wrapf(appErrors.BadRequest, "Validation error: %w", err))
+		message := "Validation error"
+		wErr := errors.Wrapf(appErrors.BadRequest, "%s: %w", message, err)
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, err.Error(), wErr)
 		return
 	}
 
 	user, err := h.service.Update(r.Context(), id, &userTemplate)
+
 	if err != nil {
-		response.RenderError(r.Context(), w, "", err)
+		wErr := errors.Wrap(err, "Not updated")
+		logger.Error(wErr.Error())
+		response.RenderError(r.Context(), w, "", wErr)
 		return
 	}
 

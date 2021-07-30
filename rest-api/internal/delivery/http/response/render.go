@@ -5,15 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"go.uber.org/zap"
 	"net/http"
 	appError "workshops/rest-api/internal/errors"
 )
-
-type Logger interface {
-	WithLogger(logger *zap.Logger)
-}
 
 //Response represents a response containing an error message.
 type responsePayload struct {
@@ -21,7 +15,7 @@ type responsePayload struct {
 	Payload interface{} `json:"payload,omitempty"`
 }
 
-func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err error) Logger {
+func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err error) {
 	errorMsg := msg
 	if errorMsg == "" {
 		errorMsg = err.Error()
@@ -39,13 +33,9 @@ func RenderError(ctx context.Context, w http.ResponseWriter, msg string, err err
 		status = http.StatusUnauthorized
 	}
 	Render(w, resp, status)
-	return ErrorLogger{
-		code:    status,
-		message: fmt.Sprintf("%s : %s", msg, err.Error()),
-	}
 }
 
-func Render(w http.ResponseWriter, res interface{}, status int) Logger {
+func Render(w http.ResponseWriter, res interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	data := res
 	if _, ok := data.(responsePayload); !ok {
@@ -58,19 +48,11 @@ func Render(w http.ResponseWriter, res interface{}, status int) Logger {
 	if err != nil {
 		// XXX Do something with the error ;)
 		w.WriteHeader(http.StatusInternalServerError)
-		return ErrorLogger{
-			code:    http.StatusInternalServerError,
-			message: err.Error(),
-		}
 	}
 
 	w.WriteHeader(status)
 
 	if _, err = w.Write(content); err != nil {
 		// XXX Do something with the error ;)
-	}
-	return SuccessLogger{
-		code:    status,
-		message: "Successful done request",
 	}
 }

@@ -8,5 +8,6 @@ func (c stringList) Contains(v string) bool {
 			return true
 		}
 	}
+
 	return false
 }

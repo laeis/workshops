@@ -20,7 +20,7 @@ type TaskRepository interface {
 	Fetch(ctx context.Context, filters TaskQueryBuilder) (entities.Tasks, error)
 	Get(ctx context.Context, id int) (*entities.Task, error)
 	Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error)
-	Store(ctx context.Context, task *entities.Task) (*entities.Task, error)
+	Store(ctx context.Context, task *entities.Task, userId string) (*entities.Task, error)
 	Delete(ctx context.Context, id int) (bool, error)
 }
 
@@ -63,8 +63,8 @@ func (ts *TaskService) Fetch(ctx context.Context, filters *filters.TaskFilter) (
 func (ts *TaskService) Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error) {
 	return ts.repo.Update(ctx, id, task)
 }
-func (ts *TaskService) Create(ctx context.Context, task *entities.Task) (*entities.Task, error) {
-	return ts.repo.Store(ctx, task)
+func (ts *TaskService) Create(ctx context.Context, task *entities.Task, userId string) (*entities.Task, error) {
+	return ts.repo.Store(ctx, task, userId)
 }
 func (ts *TaskService) Delete(ctx context.Context, id int) (bool, error) {
 	return ts.repo.Delete(ctx, id)

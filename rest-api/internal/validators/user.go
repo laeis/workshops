@@ -1,34 +1,38 @@
 package validators
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"net/mail"
 	"time"
 	"workshops/rest-api/internal/entities"
-	appError "workshops/rest-api/internal/errors"
 )
 
 var emailRules = func(u *entities.User) error {
 	if u.Email == "" {
-		return errors.Wrapf(appError.BadRequest, "User email empty")
+		return errors.New("User email empty")
 	}
+
 	if _, err := mail.ParseAddress(u.Email); err != nil {
-		return errors.Wrapf(appError.BadRequest, "User email not valid: %w", err)
+		return fmt.Errorf("User email not valid: %w", err)
 	}
+
 	return nil
 }
 
 var passwordRules = func(u *entities.User) error {
 	if "" == u.Password {
-		return errors.Wrap(appError.BadRequest, "User password empty")
+		return errors.New("User password empty")
 	}
+
 	return nil
 }
 
 var timezoneRules = func(u *entities.User) error {
 	if _, err := time.LoadLocation(u.Timezone); err != nil {
-		return errors.Wrapf(appError.BadRequest, "User timezone not valid: %w", err)
+		return fmt.Errorf("User timezone not valid: %w", err)
 	}
+
 	return nil
 }
 
@@ -54,6 +58,7 @@ func UserValidator(u *entities.User) *user {
 //Validate chek User fields by rules
 func (u *user) Validate(fields ...string) error {
 	vld := stringList(fields)
+
 	if len(vld) == 0 {
 		vld = u.fields
 	}
