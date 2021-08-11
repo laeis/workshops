@@ -76,7 +76,16 @@ func serve(ctx context.Context) (err error) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
+	var conn *grpc.ClientConn
+	conn, err = grpc.Dial(c.GRPCConfig.Host, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %s", err)
+	}
+	defer conn.Close()
+	grpcClient := pb.NewTaskServiceClient(conn)
+
 	taskController := handler.NewTask(taskService, logger)
+	grpcTaskController := handler.NewTaskGRPC(grpcClient, logger)
 	userController := handler.NewUser(userService, logger)
 	authController := handler.NewAuth(userService, logger)
 
@@ -88,6 +97,7 @@ func serve(ctx context.Context) (err error) {
 
 	router.Task(r.PathPrefix("/tasks").Subrouter(), taskController, auhMiddleware)
 	router.User(r.PathPrefix("/users").Subrouter(), userController, auhMiddleware)
+	router.TaskGRPC(r.PathPrefix("/grpc/tasks").Subrouter(), grpcTaskController, auhMiddleware)
 	router.Auth(r, authController, auhMiddleware)
 
 	srv := &http.Server{
@@ -118,7 +128,7 @@ func serve(ctx context.Context) (err error) {
 
 	log.Printf("prometeus started")
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9090))
+	lis, err := net.Listen("tcp", c.GRPCConfig.Host)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

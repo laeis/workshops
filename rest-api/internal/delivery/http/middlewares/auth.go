@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
+	"google.golang.org/grpc/metadata"
 	"net/http"
 	"workshops/rest-api/internal/config"
 	rest "workshops/rest-api/internal/delivery/http"
@@ -44,6 +45,10 @@ func AuthAdapter(service rest.AuthService, jwtWrapper services.SecurityToken) Ad
 			}
 			ctx := context.WithValue(r.Context(), config.CtxAuthId, user.Id)
 			ctx = context.WithValue(ctx, config.CtxToken, clientToken)
+			ctx = metadata.NewOutgoingContext(ctx, metadata.New(map[string]string{
+				"Authorization": "Bearer " + clientToken,
+			}))
+
 			metrics.RequestUserCounter.With(prometheus.Labels{
 				"user_email": user.Email,
 				"request":    r.URL.String(),

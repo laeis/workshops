@@ -8,6 +8,7 @@ const (
 type AppConfig struct {
 	*DBConfig
 	*JWTConfig
+	*GRPCConfig
 }
 
 type DBConfig struct {
@@ -21,4 +22,8 @@ type DBConfig struct {
 type JWTConfig struct {
 	SecretKey       string `env:"JWT_SECRET_KEY"`
 	ExpirationHours int64  `env:"JWT_EXPIRATION_HOURS,default=1"`
+}
+
+type GRPCConfig struct {
+	Host string `env:"GRPC_HOST,default=:9090"`
 }
