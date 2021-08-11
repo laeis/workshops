@@ -26,7 +26,7 @@ func (r *Task) Fetch(ctx context.Context, taskBuilder services.TaskQueryBuilder)
 	var count int
 	err := r.Connection.QueryRow("SELECT COUNT(*) FROM tasks").Scan(&count)
 
-	query := "SELECT id, title, description, start_date, category FROM tasks WHERE 0 = 0 "
+	query := "SELECT id, title, description, start_date, category, user_id FROM tasks WHERE 0 = 0 "
 	query = taskBuilder.BuildCategoryQuery(query)
 	query = taskBuilder.BuildPeriodQuery(query)
 	userId := ctx.Value(config.CtxAuthId).(string)
@@ -44,7 +44,7 @@ func (r *Task) Fetch(ctx context.Context, taskBuilder services.TaskQueryBuilder)
 
 	for rows.Next() {
 		var task entities.Task
-		err = rows.Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category)
+		err = rows.Scan(&task.Id, &task.Title, &task.Description, &task.Date, &task.Category, &task.UserId)
 
 		if err != nil {
 			log.Print("Failed to scan task: ", err)

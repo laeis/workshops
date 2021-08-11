@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"workshops/rest-api/internal/config"
 	"workshops/rest-api/internal/entities"
 	appError "workshops/rest-api/internal/errors"
 	"workshops/rest-api/internal/repositories/postgre_sql/builders"
@@ -104,9 +103,8 @@ func (r *User) DeleteToken(ctx context.Context, user *entities.User, token strin
 	return nil
 }
 
-func (r *User) GetAuthTimezone(ctx context.Context) (string, error) {
-	authId := ctx.Value(config.CtxAuthId).(string)
-	user, err := r.Get(ctx, authId)
+func (r *User) GetTimezone(ctx context.Context, userId string) (string, error) {
+	user, err := r.Get(ctx, userId)
 	if err != nil {
 		return "", errors.New("Some context auth error")
 	}

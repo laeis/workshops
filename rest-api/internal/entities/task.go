@@ -1,7 +1,6 @@
 package entities
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -21,7 +20,20 @@ func (t *Task) InTimezone(timezone string) {
 	if err != nil {
 		return
 	}
-	fmt.Println(t.Date)
-	fmt.Println(t.Date.In(location))
 	t.Date = t.Date.In(location)
+}
+
+func (t *Task) UpdateIfExists(task *Task) {
+	if task.Title != "" {
+		t.Title = task.Title
+	}
+	if task.Description != "" {
+		t.Description = task.Description
+	}
+	if task.Category != "" {
+		t.Category = task.Category
+	}
+	if !task.Date.IsZero() && task.Date != time.Unix(0, 0).UTC() {
+		t.Date = task.Date
+	}
 }

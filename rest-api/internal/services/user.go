@@ -17,7 +17,7 @@ type UserRepository interface {
 	Store(ctx context.Context, user *entities.User) (*entities.User, error)
 	AddToken(ctx context.Context, user *entities.User, token string) error
 	DeleteToken(ctx context.Context, user *entities.User, token string) error
-	GetAuthTimezone(ctx context.Context) (string, error)
+	GetTimezone(ctx context.Context, userId string) (string, error)
 }
 
 type SecurityToken interface {

@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package task;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "bitbucket.use.dom.carezen.net/grpc-example/pb";
+
+message TaskRequest {
+  uint32 id = 1;
+}
+
+message FetchTaskRequest {
+  enum Category {
+    every = 0;
+    note = 1;
+    event = 2;
+  }
+  enum Period {
+    all = 0;
+    day = 1;
+    week = 2;
+    month = 3;
+    year = 4;
+  }
+  enum Order {
+    asc = 0;
+    desc = 1;
+  }
+  enum OrderBy {
+    id = 0;
+    title = 1;
+    start_date = 2;
+  }
+  Category category = 1;
+  Period period = 2;
+  Order order = 3;
+  OrderBy order_by = 4;
+}
+
+
+message Task {
+  uint32 id = 1;
+  string user_id = 2;
+  string title = 3;
+  string description = 4;
+  string category = 5;
+  google.protobuf.Timestamp date = 6;
+}
+
+
+message CreateTaskRequest {
+  string title = 2;
+  string description = 3;
+  enum Category {
+    note = 0;
+    event = 1;
+  }
+  Category category = 5;
+  google.protobuf.Timestamp date = 6;
+}
+
+message UpdateTaskRequest {
+  uint32 id = 1;
+  string title = 2;
+  string description = 3;
+  enum Category {
+    note = 0;
+    event = 1;
+  }
+  Category category = 5;
+  google.protobuf.Timestamp date = 6;
+}
+
+message Tasks {
+  repeated Task tasks = 1;
+}
+
+service TaskService {
+  rpc Get (TaskRequest) returns (Task);
+  rpc Fetch (FetchTaskRequest) returns (Tasks);
+  rpc Create (CreateTaskRequest) returns (Task);
+  rpc Update (UpdateTaskRequest) returns (Task);
+  rpc Delete (TaskRequest) returns (Task);
+};

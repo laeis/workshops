@@ -3,6 +3,7 @@ package services
 
 import (
 	"context"
+	"workshops/rest-api/internal/config"
 	"workshops/rest-api/internal/entities"
 	"workshops/rest-api/internal/filters"
 	"workshops/rest-api/internal/repositories/postgre_sql/builders"
@@ -41,17 +42,20 @@ func (ts *TaskService) Get(ctx context.Context, id int) (*entities.Task, error) 
 	if err != nil {
 		return task, err
 	}
-	timezone, err := ts.user.GetAuthTimezone(ctx)
+	authId := ctx.Value(config.CtxAuthId).(string)
+	timezone, err := ts.user.GetTimezone(ctx, authId)
 	if err != nil {
 		return nil, err
 	}
 	task.InTimezone(timezone)
 	return task, err
 }
+
 func (ts *TaskService) Fetch(ctx context.Context, filters *filters.TaskFilter) (entities.Tasks, error) {
 	builder := builders.NewTask(filters)
 	tasks, err := ts.repo.Fetch(ctx, &builder)
-	timezone, err := ts.user.GetAuthTimezone(ctx)
+	authId := ctx.Value(config.CtxAuthId).(string)
+	timezone, err := ts.user.GetTimezone(ctx, authId)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +64,20 @@ func (ts *TaskService) Fetch(ctx context.Context, filters *filters.TaskFilter) (
 	}
 	return tasks, err
 }
-func (ts *TaskService) Update(ctx context.Context, id int, task *entities.Task) (*entities.Task, error) {
+
+func (ts *TaskService) Update(ctx context.Context, id int, newTask *entities.Task) (*entities.Task, error) {
+	task, err := ts.repo.Get(ctx, id)
+	if err != nil {
+		return task, err
+	}
+	task.UpdateIfExists(newTask)
 	return ts.repo.Update(ctx, id, task)
 }
+
 func (ts *TaskService) Create(ctx context.Context, task *entities.Task, userId string) (*entities.Task, error) {
 	return ts.repo.Store(ctx, task, userId)
 }
+
 func (ts *TaskService) Delete(ctx context.Context, id int) (bool, error) {
 	return ts.repo.Delete(ctx, id)
 }

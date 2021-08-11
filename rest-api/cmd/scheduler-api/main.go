@@ -11,18 +11,23 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sethvargo/go-envconfig"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 	"workshops/rest-api/internal/config"
+	grpcHandler "workshops/rest-api/internal/delivery/grpc"
+	"workshops/rest-api/internal/delivery/grpc/interceptors"
 	handler "workshops/rest-api/internal/delivery/http"
 	"workshops/rest-api/internal/delivery/http/middlewares"
 	"workshops/rest-api/internal/delivery/http/router"
 	"workshops/rest-api/internal/entities"
 	"workshops/rest-api/internal/repositories/postgre_sql"
 	"workshops/rest-api/internal/services"
+	"workshops/rest-api/pb"
 )
 
 func init() {
@@ -48,7 +53,6 @@ func main() {
 	if err := serve(ctx); err != nil {
 		log.Printf("failed to serve:+%v\n", err)
 	}
-
 }
 
 func serve(ctx context.Context) (err error) {
@@ -114,6 +118,28 @@ func serve(ctx context.Context) (err error) {
 
 	log.Printf("prometeus started")
 
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9090))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+
+	opts := make([]grpc.ServerOption, 0)
+	authMd := interceptors.NewAuthMD(&jwtWrapper, userService)
+	opts = append(opts, grpc.ChainUnaryInterceptor(authMd.UnaryInterceptor()))
+
+	grpcServer := grpc.NewServer(opts...)
+
+	taskHandler := grpcHandler.NewTask(taskService)
+	// registering specific handlers for this server
+	pb.RegisterTaskServiceServer(grpcServer, &taskHandler)
+
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve: %s", err)
+		}
+	}()
+	log.Println("started grpc server")
+
 	<-ctx.Done()
 
 	log.Printf("server stopped")
@@ -134,6 +160,8 @@ func serve(ctx context.Context) (err error) {
 	if err := promSrv.Shutdown(ctxShutDown); err != nil {
 		log.Fatalf("promtetus server Shutdown Failed:%+s", err)
 	}
+
+	grpcServer.GracefulStop()
 
 	log.Printf("server exited properly")
 
